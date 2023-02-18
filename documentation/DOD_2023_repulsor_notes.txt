@@ -1,0 +1,27 @@
+8.2.2023
+
+Can I do it in Arduino nano with FCLK = 16 MHz??
+
+In the Nucleo Board I had:
+ - FCLK = 80 MHz
+ - Fsmp = 1 kHz
+ - 10bit ADC
+ - PWM value is truncated to 10 bits
+ - htim1 freq. = 1000 Hz
+ - htim2 freq. = 19 531.25 Hz (10 bits)
+ 
+ 
+ For the Adruino Nano I have:
+ - FCLK = 16 MHz
+ - Fsmp = 1 kHz (or 500 Hz)
+ - 10 bit ADC
+ - Timer with PWM frequency ~ 20 kHz
+ - maybe a button and a few LEDs.
+ - debouncer for the button
+ - UART will be optional
+ 
+ It should be doable... only the number of 16bit register operations might be tricky...
+ 
+ 
+ 
+ 
