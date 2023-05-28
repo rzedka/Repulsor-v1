@@ -1,0 +1,73 @@
+# depslib dependency file v1.0
+1685312821 source:c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\adc.c
+	"adc.h"
+
+1621118039 c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\adc.h
+	<avr/io.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<avr/interrupt.h>
+	"main.h"
+
+1685313074 c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\main.h
+
+1676731623 source:c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\fuse.c
+	<avr/io.h>
+
+1685312059 source:c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\gpio.c
+	"gpio.h"
+
+1676734676 c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\gpio.h
+	<avr/io.h>
+	<stdio.h>
+	<stdlib.h>
+	"main.h"
+
+1685313272 source:c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\main.c
+	<avr/io.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<avr/interrupt.h>
+	"main.h"
+	"uart.h"
+	"tim.h"
+	"gpio.h"
+	"adc.h"
+	"pid.h"
+
+1685302180 c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\uart.h
+	<avr/io.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<avr/interrupt.h>
+	"main.h"
+
+1685310751 c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\tim.h
+	<avr/io.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<avr/interrupt.h>
+	"main.h"
+
+1685313313 c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\pid.h
+	<avr/io.h>
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	<avr/interrupt.h>
+	"main.h"
+	"uart.h"
+
+1685313420 source:c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\pid.c
+	"pid.h"
+
+1685312067 source:c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\tim.c
+	"tim.h"
+
+1598960652 source:c:\users\radim\documents\research\repulsor-v1\source\repulsor_v1\uart.c
+	"uart.h"
+

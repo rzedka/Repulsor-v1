@@ -49,9 +49,9 @@ void TIMER0_PWM_setup(void)
 
     //TCCR0B |= (0<<WGM02)|(0<<CS02)|(1<<CS01)|(0<<CS00); /// TIMER RUNNING
     //TCCR0B |= (0<<WGM02)|(0<<CS02)|(0<<CS01)|(0<<CS00); /// TIMER STOPPED
-    TCCR0B |= (1<<WGM02)|(0<<CS02)|(1<<CS01)|(0<<CS00); /// TIMER STARTED, prescaling factor N=8
+    TCCR0B |= (0<<WGM02)|(0<<CS02)|(0<<CS01)|(1<<CS00); /// TIMER STARTED, prescaling factor N=8
     ///  Fast PWM mode, OCR0x is updated at BOTTOM position of the counter.
-    /// PWM frequency = 7.8125 kHz
+    /// PWM frequency = 62.5 kHz
 
     #endif // F_CPU_16
 
@@ -61,9 +61,10 @@ void TIMER0_PWM_setup(void)
     TCCR0B |= (1<<WGM02)|(0<<CS02)|(0<<CS01)|(1<<CS00); /// TIMER STARTED, N = 1
     ///  Fast PWM mode, OCR0x is updated at BOTTOM position of the counter.
     /// PWM frequency = 62.5 kHz
-
-
     #endif // F_CPU_4
+
+    OCR0A = 0x7F; // 50 perc Duty cycle
+    //OCR0B = 0x7F; // 50 perc Duty cycle
 
 //    TIMSK0 |= (0<<TOIE0)|(1<<OCIE0A)|(0<<OCIE0B); ///OCR0A ISR
     /// No interrupt is needed for the PWM mode.
@@ -102,32 +103,7 @@ uint16_t TIMER1_get_value(void)
 }
 
 
-/*
-void TIMER0_DECODER_setup(void)
-{
-    /// Timer0 used for LED blinking
 
-    TCCR0A |= (0<<COM0A1)|(0<<COM0A0)|(0<<COM0B1)|(0<<COM0B0)|(1<<WGM01)|(0<<WGM00);
-    /// No output pins enabled.
-    //TCCR0B |= (0<<WGM02)|(0<<CS02)|(1<<CS01)|(0<<CS00); /// TIMER RUNNING
-    TCCR0B |= (0<<WGM02)|(0<<CS02)|(1<<CS01)|(1<<CS00); /// TIMER STARTED
-    /// CTC mode, (N = 64)
-  /// CS02    CS01    CS00      N
-  ///   0       0       0       No source
-  ///   0       0       1       1
-  ///   0       1       0       8
-  ///   0       1       1       64
-  ///   1       0       0       256
-  ///   1       0       1       1024
-  ///   1       1       0       Extern Falling
-  ///   1       1       1       Extern Rising
-
-    TIMSK0 |= (0<<TOIE0)|(1<<OCIE0A)|(0<<OCIE0B);/// Output Compare A ISR
-    OCR0A = 249; /// ISR frequency 1.000 kHz
-    //OCR0A = 231; /// for bit "0"
-
-}
-*/
 
 /// ================== INTERRUPT SERVICE ROUTINE ===============================
 
@@ -140,20 +116,4 @@ ISR(TIMER1_COMPA_vect){
     ADCSRA |= (1<<ADSC);
 }
 
-/*
-ISR(TIMER0_COMPA_vect)
-{
-    /// Driving the DCC TX Pin (OUT):
-    if(pwm_pin_level==0){
-        PORTDCC |= (1<< PWM_PIN); /// Go HIGH
-        pwm_pin_level = 1;
 
-    }else{
-        PORTDCC &= ~(1<<PWM_PIN); /// Go LOW
-        pwm_pin_level = 0;
-    }/// end if
-    timer0_flag++;
-
-}
-
-*/

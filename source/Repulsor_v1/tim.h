@@ -12,15 +12,6 @@
 extern volatile uint16_t timer0_cnt;
 extern volatile uint16_t timer1_cnt;
 
-#ifdef ENCODER
-
-extern volatile uint8_t timer0_flag;
-extern volatile uint8_t dcc_tx_level;
-#endif
-
-extern volatile uint16_t timer0_cnt; /// driven by TIMER0
-extern volatile uint16_t timer1_cnt; /// driven by TIMER1
-
 
 
 void TIMER1_setup(void);

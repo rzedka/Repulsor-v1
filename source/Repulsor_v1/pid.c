@@ -8,7 +8,7 @@ uint8_t PID_CMD_Parser(int16_t *setpoint, uint16_t *Kp, uint16_t *Ki, uint16_t *
 
     char CMD_Head[5] = {0,0,0,0,0};
     char CMD_Data[15];
-    uint8_t cmd_num = 0;
+    //uint8_t cmd_num = 0;
     uint8_t i = 0;
     memset(CMD_Head,'\0',5);
     memset(CMD_Data,'\0',15);
@@ -25,7 +25,7 @@ uint8_t PID_CMD_Parser(int16_t *setpoint, uint16_t *Kp, uint16_t *Ki, uint16_t *
 
     USART_TX_STRING_WAIT(CMD_Head);
     USART_TX_WAIT('\n');
-    USART_TX_STRING_WAIT(CMD_Data);
+    //USART_TX_STRING_WAIT(CMD_Data);
     if(!strcmp(CMD_Head,"ACC0")){
         *y_i0 = 0;
     }else if(!strcmp(CMD_Head,"SET_")){ /// Set the Setpoint

@@ -2,15 +2,18 @@
 
 void GPIO_setup(void)
 {
-    DDRLEDB |= (1<<LED_IDLE_PIN);   // output
-    PORTLEDB &= ~(1<<LED_IDLE_PIN); // LED0 OFF
+    DDR_LED |= (1<<LED_IDLE_PIN);   // output
+    PORT_LED &= ~(1<<LED_IDLE_PIN); // LED_IDLE OFF
 
-    DDRLEDB |= (1<<LED_OVF_PIN);   // output
-    PORTLEDB &= ~(1<<LED_OVF_PIN); // LED0 OFF
-    //DDR_MOSFET |= (1<<MOSFET3_PIN)|(1<<MOSFET2_PIN)|(1<<MOSFET1_PIN)|(1<<MOSFET0_PIN);
+    DDR_LED |= (1<<LED_OVF_PIN);   // output
+    PORT_LED &= ~(1<<LED_OVF_PIN); // LED_OVF OFF
 
-    /// In Default all MOSFETs turned OFF:
-    //PORT_MOSFET &= ~((1<<MOSFET3_PIN)|(1<<MOSFET2_PIN)|(1<<MOSFET1_PIN)|(1<<MOSFET0_PIN));
+    DDR_BTN &= ~(1<<PIN_BTN0);   // input
+    PORT_BTN |= (1<<PIN_BTN0); // internal pull-up resistor
+
+    ///  The MOSFET is at D4 (OC0A, TIMER0-driven pin)
+    DDR_FET |= (1<<PIN_FET0);
+//    PORT_FET &= ~(1<<PIN_FET0); // FET0 OFF
 
     led_flag = 0;
 }
@@ -38,9 +41,9 @@ void LED_toggle(uint8_t led_bit)
 
     if(led_flag&led_bit){
         led_flag &= ~led_bit;
-        PORTB &= ~(1<<bitshift);
+        PORT_LED &= ~(1<<bitshift);
     }else{ /// The LED is off
         led_flag |= led_bit;
-        PORTB |= (1<<bitshift);
+        PORT_LED |= (1<<bitshift);
     }
 }

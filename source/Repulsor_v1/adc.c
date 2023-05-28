@@ -38,5 +38,5 @@ ISR(ADC_vect)
     adc_value = ADCL; // 0x00FF
     adc_value |= (uint16_t)(ADCH<<8); // 0x03FF
 
-    adc_flag = 1;
+    adc_flag++;
 }

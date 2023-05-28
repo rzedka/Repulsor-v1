@@ -13,16 +13,18 @@
 #include "tim.h"
 #include "gpio.h" // contains led_toggle() only
 #include "adc.h"
+#include "pid.h"
 
 /// Global Variables ============================
 
 
     volatile uint8_t rx_array[20];
-    volatile uint8_t uart_flag; /// ISR variable
-    volatile unsigned char uart_rx_array[50];       /// ISR variable
-    volatile uint8_t uart_idx;          /// ISR variable
-    volatile uint8_t uart_char_idx;          /// ISR variable
-//    volatile uint8_t timer0_flag;\
+    #ifdef UART_TERM
+        volatile uint8_t uart_flag; /// ISR variable
+        volatile unsigned char uart_rx_array[50];       /// ISR variable
+        volatile uint8_t uart_idx;          /// ISR variable
+        volatile uint8_t uart_char_idx;          /// ISR variable
+    #endif // UART_TERM
 
     volatile uint16_t adc_value;
     volatile uint8_t adc_flag;
@@ -43,16 +45,17 @@ int main(void)
     int16_t setpoint = SET_MIN;
     int16_t error[2] = {0,0};
 
-    uint16_t k_p = 200;
+    uint16_t k_p = 100;
     uint16_t k_i = 0;
-    uint16_t k_d = 400;
+    uint16_t k_d = 100;
     int16_t y_p = 0;
     int16_t y_i[3] = {0,0,0};
     int16_t y_d = 0;
     int16_t y_sum = 0;
+    uint8_t pwm_value = 0;
     uint8_t mode = 0; /// oscillation mode
-    uint16_t aux_cnt = 0;
-    int8_t osc_step = 1;
+    //uint16_t aux_cnt = 0;
+    //int8_t osc_step = 1;
 
     uint8_t adc_flag_f = 0;
     uint8_t adc_cal_flag = 0; /// ADC calibration done after RESET
@@ -61,37 +64,61 @@ int main(void)
     #ifdef UART_TERM
         USART_init();
         uint8_t uart_flag_f = 0;
+        char buffer [33];
     #endif // UART_TERM
 
     GPIO_setup();
 
-    EIMSK |= (1<< INT0);
+//    EIMSK |= (1<< INT0);
 
-    TIMER0_PWM_setup(); /// PWM, 7.8125 kHz
-    TIMER1_setup(); /// (timer 1ms)
+    TIMER0_PWM_setup(); /// PWM, 7.8125 kHz (driving pin OC0A)
+    TIMER1_setup(); /// (timer 1ms, ADC sampling period)
     ADC_setup(); /// Manual ADC triggering, ISR on,
 
     sei();/// Enable Interrupts
+    #ifdef UART_TERM
+        /// ============ Init UART message =============================
+        USART_TX_STRING_WAIT("==== Repulsor v1 ====\n");
 
+    #endif // UART_TERM
     /// ======================== LOOP ===================
     while(1){
 
-//       DCC_ENCODER_MainFCN();
 
        /// BACKGROUND BLINK PROCESS:
         if( (TIMER1_get_value() - ref_timer) >= T_IDLE){
             ref_timer = TIMER1_get_value();
             LED_toggle(0x01); /// PINB5 (built-in LED)
+            #ifdef UART_TERM
+               /* USART_TX_STRING_WAIT("err ");
+                USART_TX_STRING_WAIT(itoa(error[1],buffer,10));
+                USART_TX_WAIT('\n');
+                USART_TX_STRING_WAIT("Y_sum ");
+                USART_TX_STRING_WAIT(itoa(y_sum,buffer,10));
+                USART_TX_WAIT('\n');
+                USART_TX_STRING_WAIT("pwm_value ");
+                USART_TX_STRING_WAIT(itoa(pwm_value,buffer,10));
+                USART_TX_WAIT('\n');*/
+            #endif // UART_TERM
         }
 
        /// Button debouncer process
 
 
        #ifdef UART_TERM
-        /// ============ UART Command REception =============================
+        /// ============ UART Command Reception =============================
         if(uart_flag_f != uart_flag){
             uart_flag_f = uart_flag;
             PID_CMD_Parser(&setpoint, &k_p, &k_i, &k_d, &y_i[0], &mode);/// int16, uint16, uint16, uint16
+            USART_TX_STRING_WAIT("set  k_p  k_i  k_d\n");
+            USART_TX_STRING_WAIT(itoa(setpoint,buffer,10));
+            USART_TX_WAIT(' ');
+            USART_TX_STRING_WAIT(itoa(k_p,buffer,10));
+            USART_TX_WAIT(' ');
+            USART_TX_STRING_WAIT(itoa(k_i,buffer,10));
+            USART_TX_WAIT(' ');
+            USART_TX_STRING_WAIT(itoa(k_d,buffer,10));
+            USART_TX_WAIT('\n');
             //mult_out = setpoint*setpoint;
             //USART_TX_STRING_WAIT("\n Mult_out = ");
             //USART_TX_STRING_WAIT(itoa(mult_out,buffer,10));
@@ -149,9 +176,9 @@ int main(void)
 
                 if(y_sum < 0){ /// Overflow indication
                     y_sum =0;
-                    PORTLEDB |= (1<<LED_OVF_PIN);
+                    PORT_LED |= (1<<LED_OVF_PIN);
                 }else{
-                    PORTLEDB &= ~(1<<LED_OVF_PIN);
+                    PORT_LED &= ~(1<<LED_OVF_PIN);
                 }
 
                 #ifdef DEBUG
@@ -163,6 +190,7 @@ int main(void)
                 #endif // DEBUG
                 //pwm_value = (y_sum>>8)&0x7F; /// Truncate to 7-bit width
                 pwm_value = (y_sum>>7); /// 8-bit width
+                //pwm_value = 127;
                 #ifdef DEBUG
                     #ifdef UART_TERM
                         USART_TX_STRING_WAIT("pwm_value ");
@@ -171,23 +199,19 @@ int main(void)
                     #endif // UART_TERM
                 #endif // DEBUG
 
-                TIMER0_PWM_update(pwm_value);
+               TIMER0_PWM_update(pwm_value);
 
 
             } /// end if
             error[0] = error[1];
        }
-
-
     }
-
-
     return 0;
 }
 
 #ifdef UART_TERM
 
-ISR(USART_RX_vect) /// ====================== UART (ENCODER) DATA RECEPTION ===============================================
+ISR(USART_RX_vect) /// ====================== UART DATA RECEPTION ===============================================
 { /// UART RX complete Interrupt:
     cli();
 

@@ -10,22 +10,10 @@
 
 #include "main.h"
 
-#ifdef ENCODER
+extern volatile uint8_t rx_array[20];
+extern volatile uint8_t uart_flag;
+extern volatile uint8_t uart_idx;
 
-    extern volatile uint8_t rx_array[20];
-    extern volatile uint8_t uart_flag;
-    extern volatile uint8_t uart_idx;
-
-#endif // ENCODER
-
-#ifdef DECODER
-    #ifdef UART_TERM
-        extern volatile unsigned char uart_rx_array[50];
-        extern volatile uint8_t uart_flag;
-        extern volatile uint8_t uart_idx;
-    #endif // UART_TERM
-
-#endif // DECODER
 
 
 void USART_init(void);
