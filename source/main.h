@@ -16,9 +16,11 @@
 //#define DEBUG
 
 /// Other:
-#define T_IDLE 1000 /// [ms]
-#define SET_MIN 50
-
+#define T_IDLE 500 /// [ms]
+#define SET_INIT 15
+#define KP_INIT 50
+#define KI_INIT 0
+#define KD_INIT 50
 
 /// LEDs:
 #define DDR_LED DDRB

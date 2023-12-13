@@ -12,36 +12,23 @@
 #include "uart.h"
 #include "tim.h"
 #include "gpio.h" // contains led_toggle() only
-#include "dcc.h"
+#include "adc.h"
+#include "pid.h"
 
 /// Global Variables ============================
 
-#ifdef ENCODER
+
     volatile uint8_t rx_array[20];
-    volatile uint8_t uart_flag; /// ISR variable
-    volatile unsigned char uart_rx_array[50];       /// ISR variable
-    volatile uint8_t uart_idx;          /// ISR variable
-    volatile uint8_t uart_char_idx;          /// ISR variable
-    volatile uint8_t timer0_flag;
-    volatile uint8_t dcc_tx_level;
-
-#endif // ENCODER
-
-#ifdef DECODER
-    /// DECODER UART for debugging only!
     #ifdef UART_TERM
-    volatile uint8_t uart_flag; /// ISR variable
-    volatile unsigned char uart_rx_array[50];       /// ISR variable
-    volatile uint8_t uart_idx;          /// ISR variable
+        volatile uint8_t uart_flag; /// ISR variable
+        volatile unsigned char uart_rx_array[50];       /// ISR variable
+        volatile uint8_t uart_idx;          /// ISR variable
+        volatile uint8_t uart_char_idx;          /// ISR variable
     #endif // UART_TERM
-    volatile uint8_t int0_flag = 0;
-    volatile uint16_t timer1_stamp[3]; /// {stmp0, stmp1, \0}
-    volatile uint8_t odd_edge = 0; /// Info about the last edge of DCC_RX pin (1 for ODD, 0 for EVEN)
 
+    volatile uint16_t adc_value;
+    volatile uint8_t adc_flag;
 
-#endif // DECODER
-    /// Global variables for both ENCODER and DECODER:
-    volatile uint16_t timer0_cnt; /// driven by TIMER0
     volatile uint16_t timer1_cnt; /// driven by TIMER1
 
     uint8_t  led_flag; /// Use for IDLE process only
@@ -53,86 +40,179 @@ int main(void)
 {
 
     uint16_t ref_timer = 0;
-    timer0_cnt = 0;
     timer1_cnt = 0;
-    #ifdef ENCODER
+    /// PID variables:
+    int16_t setpoint = SET_INIT;
+    int16_t error[2] = {0,0};
 
-        /// Global variable initialization:
-        timer0_flag = 0;
-        uart_char_idx = 0;
-        dcc_tx_level = 1;
-        uart_flag = 0;
+    uint16_t k_p = KP_INIT;
+    uint16_t k_i = KI_INIT;
+    uint16_t k_d = KD_INIT;
+    int16_t y_p = 0;
+    int16_t y_i[3] = {0,0,0};
+    int16_t y_d = 0;
+    int16_t y_sum = 0;
+    uint8_t pwm_value = 0;
+    uint8_t mode = 0; /// oscillation mode
+    //uint16_t aux_cnt = 0;
+    //int8_t osc_step = 1;
 
-        DCC_ENCODER_Pin_Setup();
-        TIMER0_ENCODER_setup(); /// Setup TIMER0 in CTC mode (Running)
-        TIMER1_ENCODER_setup();
+    uint8_t adc_flag_f = 0;
+    uint8_t adc_cal_flag = 0; /// ADC calibration done after RESET
+    uint16_t adc_cal_value = 0;
+
+    #ifdef UART_TERM
         USART_init();
+        uint8_t uart_flag_f = 0;
+        char buffer [33];
+    #endif // UART_TERM
 
-        USART_TX_STRING_WAIT("\nENCODER mode\n");
-    #endif // ENCODER
+    GPIO_setup();
 
-    #ifdef DECODER
+//    EIMSK |= (1<< INT0);
 
-        #ifdef UART_TERM
-            USART_init();
-        #endif // UART_TERM
-
-        uint8_t dcc_decoder_mode = 0; /// 0 for the Station, 1 for the Entrance
-        timer1_stamp[0] = 0;
-        timer1_stamp[1] = 0;
-        timer1_stamp[2] = 0;
-
-        DCC_DECODER_Pin_Setup();
-        DCC_DECODER_LED_Pin_Setup(dcc_decoder_mode); /// Setting the LEDs
-
-        //ATmega328p_EXTINT_Setup();
-        EICRA |= (0 << ISC01)|(1<< ISC00); /// External interrupt (DCC RX pin).
-        EIMSK |= (1<< INT0);
-
-        TIMER1_DECODER_setup(); /// used for precise timing on the DCC bus (resolution 0.5 us)
-        TIMER0_DECODER_setup(); /// used for traffic LED blinking (timer 1ms)
-        dcc_decoder_mode = DCC_ModeSetup(); /// checking the ctrl jumpers, optional UART message print
-
-
-
-    #endif // DECODER
+    TIMER0_PWM_setup(); /// PWM, 7.8125 kHz (driving pin OC0A)
+    TIMER1_setup(); /// (timer 1ms, ADC sampling period)
+    ADC_setup(); /// Manual ADC triggering, ISR on,
 
     sei();/// Enable Interrupts
+    #ifdef UART_TERM
+        /// ============ Init UART message =============================
+        USART_TX_STRING_WAIT("==== Repulsor v1 ====\n");
 
+    #endif // UART_TERM
     /// ======================== LOOP ===================
     while(1){
-        #ifdef ENCODER
-           DCC_ENCODER_MainFCN();
-
-           /// BACKGROUND BLINK PROCESS:
-            if( (TIMER1_get_value() - ref_timer) >= T_IDLE){
-                ref_timer = TIMER1_get_value();
-                LED_toggle(0x04); /// PINB5 (built-in LED)
-            }
-        #endif // ENCODER
-
-        #ifdef DECODER
-           DCC_DECODER_MainFCN(dcc_decoder_mode);
-
-            /// BACKGROUND BLINK PROCESS:
-            if( (TIMER0_get_value() - ref_timer) >= T_IDLE){
-                ref_timer = TIMER0_get_value();
-                LED_toggle(0x04); /// PINB5 (built-in LED)
-
-            }
-        #endif // ENCODER
 
 
+       /// BACKGROUND BLINK PROCESS:
+        if( (TIMER1_get_value() - ref_timer) >= T_IDLE){
+            ref_timer = TIMER1_get_value();
+            LED_toggle(0x01); /// PINB5 (built-in LED)
+            #ifdef UART_TERM
+               /* USART_TX_STRING_WAIT("err ");
+                USART_TX_STRING_WAIT(itoa(error[1],buffer,10));
+                USART_TX_WAIT('\n');
+                USART_TX_STRING_WAIT("Y_sum ");
+                USART_TX_STRING_WAIT(itoa(y_sum,buffer,10));
+                USART_TX_WAIT('\n');
+                */
+                USART_TX_STRING_WAIT("pwm_value ");
+                USART_TX_STRING_WAIT(itoa(pwm_value,buffer,10));
+                USART_TX_WAIT('\n');
+            #endif // UART_TERM
+        }
 
+       /// Button debouncer process
+
+
+       #ifdef UART_TERM
+        /// ============ UART Command Reception =============================
+        if(uart_flag_f != uart_flag){
+            uart_flag_f = uart_flag;
+            PID_CMD_Parser(&setpoint, &k_p, &k_i, &k_d, &y_i[0], &mode);/// int16, uint16, uint16, uint16
+            USART_TX_STRING_WAIT("set  k_p  k_i  k_d\n");
+            USART_TX_STRING_WAIT(itoa(setpoint,buffer,10));
+            USART_TX_WAIT(' ');
+            USART_TX_STRING_WAIT(itoa(k_p,buffer,10));
+            USART_TX_WAIT(' ');
+            USART_TX_STRING_WAIT(itoa(k_i,buffer,10));
+            USART_TX_WAIT(' ');
+            USART_TX_STRING_WAIT(itoa(k_d,buffer,10));
+            USART_TX_WAIT('\n');
+            //mult_out = setpoint*setpoint;
+            //USART_TX_STRING_WAIT("\n Mult_out = ");
+            //USART_TX_STRING_WAIT(itoa(mult_out,buffer,10));
+        }
+
+        #endif // UART_TERM
+
+       if(adc_flag_f != adc_flag){
+           /// AD Conversion completed:
+            adc_flag_f = adc_flag;
+            if(!adc_cal_flag){/// ADC Offset Removal:
+                adc_cal_flag = 1;
+                adc_cal_value = adc_value;
+                #ifdef UART_TERM
+                    USART_TX_STRING_WAIT("ADC offset: ");
+                    USART_TX_STRING_WAIT(itoa( adc_cal_value, buffer, 10) );
+                    USART_TX_WAIT('\n');
+                #endif UART_TERM
+            }///end if
+            /// P-I-D calculations:
+            error[1] = -adc_value + adc_cal_value;
+            error[1] = setpoint - error[1];
+            #ifdef DEBUG
+                #ifdef UART_TERM
+                    USART_TX_STRING_WAIT("err ");
+                    USART_TX_STRING_WAIT(itoa(error[1],buffer,10));
+                    USART_TX_WAIT('\n');
+                #endif // UART_TERM
+            #endif // DEBUG
+
+            if(error[1] != error[0]){
+                /// If something changed, do the calculations
+                /// 1) Proportional
+                y_p = error[1]*k_p;
+                #ifdef DEBUG
+                    #ifdef UART_TERM
+                        USART_TX_STRING_WAIT("Y_p ");
+                        USART_TX_STRING_WAIT(itoa(y_p, buffer, 10));
+                        USART_TX_WAIT('\n');
+                    #endif // UART_TERM
+                #endif // DEBUG
+
+                /// 2) Integral
+                y_i[1] = error[1]*k_i + y_i[0];
+                if(y_i[1]>0)
+                    y_i[0] = y_i[1];
+                else
+                    y_i[1] = y_i[0];
+
+                /// 3) Differential
+                y_d = (error[1]-error[0])*k_d;
+
+                /// 4) SUM
+                y_sum = y_p + y_i[1] + y_d;
+
+                if(y_sum < 0){ /// Overflow indication
+                    y_sum =0;
+                    PORT_LED |= (1<<LED_OVF_PIN);
+                }else{
+                    PORT_LED &= ~(1<<LED_OVF_PIN);
+                }
+
+                #ifdef DEBUG
+                    #ifdef UART_TERM
+                        USART_TX_STRING_WAIT("Y_sum ");
+                        USART_TX_STRING_WAIT(itoa(y_sum,buffer,10));
+                        USART_TX_WAIT('\n');
+                    #endif // UART_TERM
+                #endif // DEBUG
+                //pwm_value = (y_sum>>8)&0x7F; /// Truncate to 7-bit width
+                pwm_value = (y_sum>>7); /// 8-bit width
+                //pwm_value = 127;
+                #ifdef DEBUG
+                    #ifdef UART_TERM
+                        USART_TX_STRING_WAIT("pwm_value ");
+                        USART_TX_STRING_WAIT(itoa(pwm_value,buffer,10));
+                        USART_TX_WAIT('\n');
+                    #endif // UART_TERM
+                #endif // DEBUG
+
+               TIMER0_PWM_update(pwm_value);
+
+
+            } /// end if
+            error[0] = error[1];
+       }
     }
-
-
     return 0;
 }
 
-#ifdef ENCODER
+#ifdef UART_TERM
 
-ISR(USART_RX_vect) /// ====================== UART (ENCODER) DATA RECEPTION ===============================================
+ISR(USART_RX_vect) /// ====================== UART DATA RECEPTION ===============================================
 { /// UART RX complete Interrupt:
     cli();
 
@@ -163,7 +243,6 @@ ISR(USART_RX_vect) /// ====================== UART (ENCODER) DATA RECEPTION ====
     }
     sei();
 }
-
-#endif // ENCODER
+#endif // UART_TERM
 
 
